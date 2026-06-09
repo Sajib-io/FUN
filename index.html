@@ -437,8 +437,9 @@
         } catch (err) {
           console.error(err);
           let msg = "Please allow camera access in your browser settings to use this app.";
-          if (err.name === 'NotAllowedError') msg = "Camera a
-            UIResponses.showErrorModal("Camera Error", msg);
+          if (err.name === 'NotAllowedError') msg = "Camera access was denied. Please update site permissions.";
+          else if (err.name === 'NotFoundError') msg = "No camera hardware detected on this device.";
+          UIResponses.showErrorModal("Camera Error", msg);
         }
       }
 
