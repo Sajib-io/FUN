@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#09090b">
-  <title>Lumina | Pro Air Draw</title>
+  <title>Lumina | Air Typing</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -16,25 +16,24 @@
 
   <style>
     :root {
-      /* Mature Dark Mode Palette */
       --bg-base: #09090b;
-      --bg-surface: rgba(24, 24, 27, 0.7);
-      --bg-surface-hover: rgba(39, 39, 42, 0.9);
-      --border-light: rgba(255, 255, 255, 0.08);
-      --border-focus: rgba(255, 255, 255, 0.2);
+      --bg-surface: rgba(24, 24, 27, 0.5);
+      --bg-key: rgba(255, 255, 255, 0.1);
+      --bg-key-hover: rgba(255, 255, 255, 0.25);
+      --bg-key-active: rgba(16, 185, 129, 0.8);
       
+      --border-light: rgba(255, 255, 255, 0.15);
       --text-primary: #fafafa;
       --text-secondary: #a1a1aa;
       
-      --accent-primary: #10b981; /* Emerald */
-      --accent-danger: #ef4444; /* Red */
-      --accent-brand: #3b82f6; /* Blue */
+      --accent-primary: #10b981; 
+      --accent-danger: #ef4444; 
+      --accent-brand: #3b82f6; 
       
-      /* Z-Index Hierarchy */
       --z-video: 1;
-      --z-canvas: 2;
-      --z-ui: 3;
-      --z-overlay: 40;
+      --z-overlay: 2;
+      --z-keyboard: 10;
+      --z-ui-canvas: 20;
       --z-modal: 50;
       --z-toast: 100;
     }
@@ -45,142 +44,137 @@
       width: 100vw; height: 100vh; overflow: hidden;
       background-color: var(--bg-base); color: var(--text-primary);
       font-family: 'Inter', system-ui, sans-serif;
-      touch-action: none; /* Prevent pinch-zoom and pull-to-refresh */
+      touch-action: none;
     }
 
     /* Core Layout */
-    #viewport { position: absolute; inset: 0; background: var(--bg-base); }
-    video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); opacity: 0.2; z-index: var(--z-video); }
-    canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: var(--z-canvas); pointer-events: none; }
-    #uiCanvas { z-index: var(--z-ui); }
-
-    /* --- Mature UI Components --- */
-
-    /* 1. Glassmorphic Toolbar */
-    .toolbar-container {
-      position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%);
-      display: flex; flex-direction: column; align-items: center; gap: 16px;
-      z-index: var(--z-overlay); width: calc(100% - 32px); max-width: 480px;
-      pointer-events: none;
+    #viewport { position: absolute; inset: 0; }
+    
+    /* Clear view of the camera */
+    video { 
+      position: absolute; inset: 0; width: 100%; height: 100%; 
+      object-fit: cover; transform: scaleX(-1); 
+      z-index: var(--z-video); opacity: 1; 
+    }
+    
+    /* Subtle dark gradient so UI remains visible */
+    .video-overlay {
+      position: absolute; inset: 0; z-index: var(--z-overlay);
+      background: radial-gradient(circle at center, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 100%);
     }
 
-    .glass-panel {
-      background: var(--bg-surface); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: var(--z-ui-canvas); pointer-events: none; }
+
+    /* --- Virtual Typing UI --- */
+    #typing-interface {
+      position: absolute; inset: 0; z-index: var(--z-keyboard);
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+      padding: 40px 20px; gap: 40px; pointer-events: none; /* Let pointer events pass to canvas if needed */
+    }
+
+    /* Text Output Display */
+    .text-display-wrapper {
+      width: 100%; max-width: 800px; margin-bottom: auto; margin-top: 20px;
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+    }
+
+    .text-display {
+      width: 100%; min-height: 80px; padding: 24px;
+      background: rgba(10, 10, 15, 0.6); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
       border: 1px solid var(--border-light); border-radius: 24px;
-      padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;
-      width: 100%; pointer-events: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-      transition: border-color 0.3s ease;
+      font-family: 'JetBrains Mono', monospace; font-size: 2rem;
+      color: var(--text-primary); text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4); word-wrap: break-word;
+      display: flex; align-items: center; justify-content: center;
     }
+    .cursor-blink { animation: blink 1s step-end infinite; color: var(--accent-primary); }
+    @keyframes blink { 50% { opacity: 0; } }
 
-    /* 2. Custom Color Palette (Replacing native input[type=color]) */
-    .color-palette { display: flex; gap: 10px; }
-    .color-swatch {
-      width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent;
-      cursor: pointer; transition: transform 0.2s, border-color 0.2s;
+    /* Keyboard Container */
+    .keyboard {
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      width: 100%; max-width: 900px; pointer-events: auto;
     }
-    .color-swatch.active { border-color: white; transform: scale(1.15); box-shadow: 0 0 12px currentColor; }
     
-    /* 3. Custom Brush Size Visualizer */
-    .brush-control { display: flex; align-items: center; gap: 12px; }
-    .brush-preview-container { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); border-radius: 50%; }
-    .brush-preview { background: white; border-radius: 50%; transition: width 0.1s, height 0.1s, background-color 0.3s; }
+    .keyboard-row { display: flex; justify-content: center; gap: 10px; width: 100%; }
+
+    .key {
+      background: var(--bg-key); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-light); border-radius: 16px;
+      height: 64px; min-width: 64px; flex: 1; max-width: 80px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; font-weight: 600; color: var(--text-primary);
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    /* Key States applied via JS */
+    .key.hovered {
+      background: var(--bg-key-hover); transform: translateY(-4px); border-color: rgba(255,255,255,0.4);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
+    .key.pressed {
+      background: var(--bg-key-active); transform: translateY(2px) scale(0.95);
+      box-shadow: 0 0 20px var(--accent-primary); border-color: var(--accent-primary); color: #000;
+    }
+
+    .key-wide { max-width: 160px; font-size: 1.1rem; }
+    .key-space { max-width: 400px; flex: 3; }
     
-    input[type="range"] {
-      -webkit-appearance: none; width: 100px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; outline: none;
+    /* Top Status Bar */
+    .status-bar {
+      position: absolute; top: 24px; left: 24px; z-index: var(--z-keyboard);
+      display: flex; gap: 12px;
     }
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--text-primary); cursor: pointer; transition: transform 0.1s;
-    }
-    input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); }
 
-    /* Action Buttons */
-    .btn-icon {
-      background: transparent; border: none; color: var(--text-secondary);
-      width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; transition: all 0.2s;
-    }
-    .btn-icon:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
-    .btn-icon:active { transform: scale(0.95); }
-    .btn-icon.danger:hover { color: var(--accent-danger); background: rgba(239, 68, 68, 0.1); }
-
-    /* 4. Status Pill */
     .status-pill {
       background: var(--bg-surface); backdrop-filter: blur(10px); border: 1px solid var(--border-light);
-      padding: 6px 16px; border-radius: 20px; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.5px;
-      display: flex; align-items: center; gap: 8px; pointer-events: auto; text-transform: uppercase;
-      color: var(--text-secondary); transition: all 0.3s ease;
+      padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.5px;
+      display: flex; align-items: center; gap: 8px; text-transform: uppercase; color: var(--text-secondary);
+      transition: all 0.3s ease;
     }
-    .status-indicator { width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); transition: background 0.3s; }
+    .status-indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--text-secondary); transition: background 0.3s; }
 
-    /* 5. Toast Notification System */
-    #toast-container {
-      position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
-      display: flex; flex-direction: column; gap: 8px; z-index: var(--z-toast); pointer-events: none;
+    .btn-icon {
+      background: var(--bg-surface); border: 1px solid var(--border-light); color: var(--text-secondary);
+      width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; backdrop-filter: blur(10px); transition: all 0.2s; pointer-events: auto;
     }
-    .toast {
-      background: rgba(24, 24, 27, 0.9); backdrop-filter: blur(12px); border: 1px solid var(--border-light);
-      padding: 12px 20px; border-radius: 12px; color: white; font-size: 0.9rem; font-weight: 500;
-      display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .toast.hide { animation: toastSlideOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-    .toast-icon { font-size: 1.2rem; }
-    .toast.success .toast-icon { color: var(--accent-primary); }
-    .toast.error .toast-icon { color: var(--accent-danger); }
-    .toast.info .toast-icon { color: var(--accent-brand); }
+    .btn-icon:hover { color: var(--text-primary); background: rgba(255,255,255,0.1); }
+    .btn-icon:active { transform: scale(0.92); }
 
+    /* Modals & Toasts (Same as before) */
+    #toast-container { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: var(--z-toast); pointer-events: none; }
+    .toast { background: rgba(24, 24, 27, 0.9); backdrop-filter: blur(12px); border: 1px solid var(--border-light); padding: 12px 20px; border-radius: 12px; color: white; font-size: 0.9rem; font-weight: 500; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); animation: toastSlideIn 0.4s forwards; }
+    .toast.hide { animation: toastSlideOut 0.3s forwards; }
     @keyframes toastSlideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     @keyframes toastSlideOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-20px); opacity: 0; } }
 
-    /* 6. Professional Modal / Overlay System */
-    .overlay-backdrop {
-      position: fixed; inset: 0; background: rgba(9, 9, 11, 0.85); backdrop-filter: blur(8px);
-      z-index: var(--z-modal); display: flex; align-items: center; justify-content: center;
-      padding: 20px; transition: opacity 0.4s ease, visibility 0.4s;
-    }
+    .overlay-backdrop { position: fixed; inset: 0; background: rgba(9, 9, 11, 0.85); backdrop-filter: blur(8px); z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; padding: 20px; transition: opacity 0.4s, visibility 0.4s; }
     .overlay-backdrop.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-    
-    .modal-card {
-      background: #18181b; border: 1px solid var(--border-light); border-radius: 24px;
-      padding: 32px; max-width: 420px; width: 100%; text-align: center;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-      transform: translateY(0) scale(1); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .overlay-backdrop.hidden .modal-card { transform: translateY(20px) scale(0.95); }
-
-    .modal-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
+    .modal-card { background: #18181b; border: 1px solid var(--border-light); border-radius: 24px; padding: 32px; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+    .modal-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 8px; }
     .modal-desc { font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.5; }
     
     .gesture-guide { display: grid; gap: 16px; margin-bottom: 32px; text-align: left; }
     .guide-item { display: flex; align-items: center; gap: 16px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 12px; }
-    .guide-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; }
+    .guide-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; color: var(--accent-primary); }
 
-    .btn-primary {
-      width: 100%; background: var(--text-primary); color: var(--bg-base); border: none;
-      padding: 14px; font-size: 1rem; font-weight: 600; border-radius: 12px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;
-    }
+    .btn-primary { width: 100%; background: var(--text-primary); color: var(--bg-base); border: none; padding: 14px; font-size: 1rem; font-weight: 600; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
     .btn-primary:active { transform: scale(0.98); }
     .btn-primary:disabled { opacity: 0.5; cursor: not-progress; }
-
-    /* Loading Spinner */
-    .spinner {
-      width: 20px; height: 20px; border: 3px solid rgba(0,0,0,0.1); border-top-color: currentColor;
-      border-radius: 50%; animation: spin 1s linear infinite; display: none;
-    }
+    
+    .spinner { width: 20px; height: 20px; border: 3px solid rgba(0,0,0,0.1); border-top-color: currentColor; border-radius: 50%; animation: spin 1s linear infinite; display: none; }
     .btn-primary.loading .spinner { display: block; }
     .btn-primary.loading .material-symbols-outlined { display: none; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* Responsive */
-    @media (max-width: 600px) {
-      .glass-panel { padding: 10px 14px; flex-direction: column; gap: 12px; border-radius: 20px; }
-      .toolbar-container { bottom: 16px; }
-      .panel-row { display: flex; width: 100%; justify-content: space-between; align-items: center; }
-      input[type="range"] { width: 120px; }
-    }
-    @media (min-width: 601px) {
-      .panel-row { display: contents; } /* Flattens the layout on desktop */
+    @media (max-width: 768px) {
+      .key { height: 50px; min-width: 30px; font-size: 1.2rem; }
+      .text-display { font-size: 1.5rem; padding: 16px; min-height: 60px; }
+      #typing-interface { padding: 20px 10px; gap: 20px; }
+      .keyboard-row { gap: 6px; }
     }
   </style>
 </head>
@@ -190,21 +184,23 @@
 
   <div class="overlay-backdrop" id="startupModal">
     <div class="modal-card">
-      <h1 class="modal-title">Lumina Pro</h1>
-      <p class="modal-desc">AI-powered air drawing requires camera access. Processing happens entirely on your device.</p>
+      <h1 class="modal-title">Air Typing</h1>
+      <p class="modal-desc">Use your webcam to type in the air. Processing happens securely on your device.</p>
       
       <div class="gesture-guide" id="guideContent">
         <div class="guide-item">
-          <div class="guide-icon" style="color: var(--accent-primary)"><span class="material-symbols-outlined">touch_app</span></div>
-          <div><div style="font-weight: 600; font-size: 0.95rem">Draw</div><div style="font-size: 0.85rem; color: var(--text-secondary)">Raise index finger</div></div>
+          <div class="guide-icon"><span class="material-symbols-outlined">ads_click</span></div>
+          <div>
+            <div style="font-weight: 600; font-size: 0.95rem">Move & Hover</div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary)">Move your index finger to aim</div>
+          </div>
         </div>
         <div class="guide-item">
-          <div class="guide-icon" style="color: var(--accent-danger)"><span class="material-symbols-outlined">back_hand</span></div>
-          <div><div style="font-weight: 600; font-size: 0.95rem">Erase</div><div style="font-size: 0.85rem; color: var(--text-secondary)">Open palm flat</div></div>
-        </div>
-        <div class="guide-item">
-          <div class="guide-icon" style="color: var(--text-secondary)"><span class="material-symbols-outlined">front_hand</span></div>
-          <div><div style="font-weight: 600; font-size: 0.95rem">Hover / Pause</div><div style="font-size: 0.85rem; color: var(--text-secondary)">Close fist</div></div>
+          <div class="guide-icon" style="color: var(--accent-primary)"><span class="material-symbols-outlined">pinch</span></div>
+          <div>
+            <div style="font-weight: 600; font-size: 0.95rem">Pinch to Type</div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary)">Tap index and thumb together</div>
+          </div>
         </div>
       </div>
 
@@ -218,74 +214,45 @@
 
   <div id="viewport">
     <video id="webcam" autoplay playsinline></video>
-    <canvas id="paintCanvas"></canvas>
+    <div class="video-overlay"></div>
+    
+    <div id="typing-interface">
+      <div class="status-bar">
+        <div class="status-pill" id="statusBadge">
+          <div class="status-indicator" id="statusDot"></div>
+          <span id="statusText">Detecting...</span>
+        </div>
+        <button class="btn-icon" id="clearTextBtn" title="Clear Text">
+          <span class="material-symbols-outlined">delete</span>
+        </button>
+      </div>
+
+      <div class="text-display-wrapper">
+        <div class="text-display">
+          <span id="outputText"></span><span class="cursor-blink">|</span>
+        </div>
+      </div>
+
+      <div class="keyboard" id="keyboardContainer">
+        </div>
+    </div>
+
     <canvas id="uiCanvas"></canvas>
   </div>
 
-  <div class="toolbar-container">
-    <div class="status-pill" id="statusBadge">
-      <div class="status-indicator" id="statusDot"></div>
-      <span id="statusText">Awaiting input</span>
-    </div>
-
-    <div class="glass-panel">
-      <div class="panel-row">
-        <div class="color-palette" id="colorPalette">
-          <div class="color-swatch active" style="background: #00ffcc; color: #00ffcc;" data-color="#00ffcc"></div>
-          <div class="color-swatch" style="background: #fbbf24; color: #fbbf24;" data-color="#fbbf24"></div>
-          <div class="color-swatch" style="background: #f43f5e; color: #f43f5e;" data-color="#f43f5e"></div>
-          <div class="color-swatch" style="background: #a855f7; color: #a855f7;" data-color="#a855f7"></div>
-          <div class="color-swatch" style="background: #ffffff; color: #ffffff;" data-color="#ffffff"></div>
-        </div>
-      </div>
-      
-      <div class="panel-row">
-        <div class="brush-control">
-          <div class="brush-preview-container">
-            <div class="brush-preview" id="brushPreview" style="width: 12px; height: 12px; background: #00ffcc;"></div>
-          </div>
-          <input type="range" id="brushSlider" min="4" max="50" value="12">
-        </div>
-
-        <div style="display: flex; gap: 8px;">
-          <button class="btn-icon" id="saveBtn" title="Export Artwork">
-            <span class="material-symbols-outlined">download</span>
-          </button>
-          <button class="btn-icon danger" id="clearBtn" title="Clear Canvas">
-            <span class="material-symbols-outlined">delete</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script>
-    /**
-     * UI Responses Manager - Handles Toasts and Modals
-     * Provides mature feedback mechanisms instead of raw alerts.
-     */
     class UIResponses {
       static showToast(message, type = 'info') {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
-        
-        let icon = 'info';
-        if (type === 'success') icon = 'check_circle';
-        if (type === 'error') icon = 'error';
-
-        toast.innerHTML = `
-          <span class="material-symbols-outlined toast-icon">${icon}</span>
-          <span>${message}</span>
-        `;
-        
+        const icon = type === 'success' ? 'check_circle' : type === 'error' ? 'error' : 'info';
+        toast.innerHTML = `<span class="material-symbols-outlined toast-icon">${icon}</span><span>${message}</span>`;
         container.appendChild(toast);
-
-        // Auto remove
         setTimeout(() => {
           toast.classList.add('hide');
           toast.addEventListener('animationend', () => toast.remove());
-        }, 3000);
+        }, 2500);
       }
 
       static showErrorModal(title, message) {
@@ -302,113 +269,117 @@
       }
     }
 
-    /**
-     * Lumina Pro App Controller
-     */
-    class LuminaApp {
+    class AirTypingApp {
       constructor() {
-        // Core elements
         this.video = document.getElementById('webcam');
-        this.paintCanvas = document.getElementById('paintCanvas');
         this.uiCanvas = document.getElementById('uiCanvas');
-        this.ctx = this.paintCanvas.getContext('2d', { willReadFrequently: true });
         this.uiCtx = this.uiCanvas.getContext('2d');
         
-        // UI Elements
-        this.startupModal = document.getElementById('startupModal');
+        this.outputText = document.getElementById('outputText');
+        this.keyboardContainer = document.getElementById('keyboardContainer');
         this.startBtn = document.getElementById('startBtn');
-        this.brushSlider = document.getElementById('brushSlider');
-        this.brushPreview = document.getElementById('brushPreview');
-        this.colorSwatches = document.querySelectorAll('.color-swatch');
         
-        // Status Elements
-        this.statusBadge = document.getElementById('statusBadge');
-        this.statusDot = document.getElementById('statusDot');
-        this.statusText = document.getElementById('statusText');
-
         // State
-        this.currentColor = '#00ffcc';
-        this.currentSize = 12;
-        this.mode = 'IDLE';
+        this.typedString = "";
         this.pointer = { x: null, y: null };
         this.smoothed = { x: null, y: null };
-        this.lastDrawn = { x: null, y: null };
-        this.lerpFactor = 0.45; 
+        this.lerpFactor = 0.5; // Slightly faster for snappier UI typing
+        
+        this.isPinching = false;
+        this.wasPinching = false;
+        this.hoveredKey = null;
+        this.keyElements = []; // Store references and bounding boxes for collision
+        this.particles = [];
 
+        this.initKeyboard();
         this.initEventListeners();
         this.initAI();
       }
 
-      initEventListeners() {
-        window.addEventListener('resize', () => this.handleResize());
-        
-        // Custom Color Palette Logic
-        this.colorSwatches.forEach(swatch => {
-          swatch.addEventListener('click', (e) => {
-            this.colorSwatches.forEach(s => s.classList.remove('active'));
-            e.target.classList.add('active');
-            this.currentColor = e.target.dataset.color;
-            this.brushPreview.style.backgroundColor = this.currentColor;
-            if (this.mode === 'DRAW') this.updateStatusUI();
+      initKeyboard() {
+        const layout = [
+          ['Q','W','E','R','T','Y','U','I','O','P'],
+          ['A','S','D','F','G','H','J','K','L'],
+          ['Z','X','C','V','B','N','M'],
+          ['SPACE', 'BACKSPACE']
+        ];
+
+        layout.forEach(row => {
+          const rowDiv = document.createElement('div');
+          rowDiv.className = 'keyboard-row';
+          
+          row.forEach(char => {
+            const keyBtn = document.createElement('div');
+            keyBtn.className = 'key';
+            keyBtn.dataset.char = char;
+            
+            if (char === 'SPACE') {
+              keyBtn.classList.add('key-space');
+              keyBtn.innerHTML = '<span class="material-symbols-outlined">space_bar</span>';
+            } else if (char === 'BACKSPACE') {
+              keyBtn.classList.add('key-wide');
+              keyBtn.innerHTML = '<span class="material-symbols-outlined">backspace</span>';
+            } else {
+              keyBtn.innerText = char;
+            }
+            
+            rowDiv.appendChild(keyBtn);
+            // Store object for collision updates later
+            this.keyElements.push({ el: keyBtn, char: char, bounds: null });
           });
+          this.keyboardContainer.appendChild(rowDiv);
+        });
+      }
+
+      updateKeyBounds() {
+        // Calculate collision rects. We do this on init and resize.
+        this.keyElements.forEach(item => {
+          item.bounds = item.el.getBoundingClientRect();
+        });
+      }
+
+      initEventListeners() {
+        window.addEventListener('resize', () => {
+          this.handleResize();
+          // Timeout ensures CSS flexbox finishes settling before calculating boxes
+          setTimeout(() => this.updateKeyBounds(), 100); 
         });
 
-        // Brush Visualizer Logic
-        this.brushSlider.addEventListener('input', (e) => {
-          this.currentSize = parseInt(e.target.value);
-          this.brushPreview.style.width = `${this.currentSize}px`;
-          this.brushPreview.style.height = `${this.currentSize}px`;
+        document.getElementById('clearTextBtn').addEventListener('click', () => {
+          this.typedString = "";
+          this.outputText.innerText = "";
+          UIResponses.showToast('Text cleared', 'info');
         });
-
-        // Action Buttons
-        document.getElementById('clearBtn').addEventListener('click', () => {
-          this.ctx.clearRect(0, 0, this.paintCanvas.width, this.paintCanvas.height);
-          UIResponses.showToast('Canvas cleared', 'info');
-        });
-
-        document.getElementById('saveBtn').addEventListener('click', () => this.exportCanvas());
         
         this.startBtn.addEventListener('click', () => this.requestCamera());
       }
 
       handleResize() {
-        const vWidth = this.video.videoWidth || 640;
-        const vHeight = this.video.videoHeight || 480;
         const wWidth = window.innerWidth;
         const wHeight = window.innerHeight;
+        this.uiCanvas.width = wWidth;
+        this.uiCanvas.height = wHeight;
         
-        const scale = Math.max(wWidth / vWidth, wHeight / vHeight);
-        
-        // Save current stroke buffer
-        const temp = document.createElement('canvas');
-        temp.width = this.paintCanvas.width; temp.height = this.paintCanvas.height;
-        if(this.paintCanvas.width > 0) temp.getContext('2d').drawImage(this.paintCanvas, 0, 0);
-
-        this.paintCanvas.width = this.uiCanvas.width = wWidth;
-        this.paintCanvas.height = this.uiCanvas.height = wHeight;
-        
-        this.ctx.drawImage(temp, 0, 0);
-        
-        this.vidScale = scale;
-        this.vidOffsetX = (vWidth * scale - wWidth) / 2;
-        this.vidOffsetY = (vHeight * scale - wHeight) / 2;
+        const vWidth = this.video.videoWidth || 640;
+        const vHeight = this.video.videoHeight || 480;
+        this.vidScale = Math.max(wWidth / vWidth, wHeight / vHeight);
+        this.vidOffsetX = (vWidth * this.vidScale - wWidth) / 2;
+        this.vidOffsetY = (vHeight * this.vidScale - wHeight) / 2;
       }
 
       async initAI() {
         try {
-          this.hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+          this.hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
           this.hands.setOptions({
             maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.6
           });
           this.hands.onResults((res) => this.onAIResults(res));
           
           await this.hands.initialize();
-          
-          // Ready to start
           this.startBtn.disabled = false;
-          this.startBtn.querySelector('#startText').innerText = "Launch Camera";
+          this.startBtn.querySelector('#startText').innerText = "Start Typing";
         } catch (e) {
-          UIResponses.showErrorModal("Initialization Failed", "Could not load AI models. Please check your internet connection.");
+          UIResponses.showErrorModal("Initialization Failed", "Could not load AI models.");
         }
       }
 
@@ -417,7 +388,6 @@
         this.startBtn.querySelector('#startText').innerText = "Connecting...";
 
         try {
-          // Explicit permission check for mature error handling
           const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 } } });
           this.video.srcObject = stream;
           
@@ -429,170 +399,164 @@
           await this.camera.start();
           this.video.addEventListener('loadedmetadata', () => {
             this.handleResize();
-            this.startupModal.classList.add('hidden');
-            UIResponses.showToast('Camera active. Ready to draw!', 'success');
+            this.updateKeyBounds();
+            document.getElementById('startupModal').classList.add('hidden');
+            UIResponses.showToast('Ready to type!', 'success');
             requestAnimationFrame(() => this.render());
           });
 
         } catch (err) {
           console.error(err);
-          let msg = "Please allow camera access in your browser settings to use this app.";
-          if (err.name === 'NotAllowedError') msg = "Camera access was denied. Please update site permissions.";
-          else if (err.name === 'NotFoundError') msg = "No camera hardware detected on this device.";
-          UIResponses.showErrorModal("Camera Error", msg);
+          UIResponses.showErrorModal("Camera Error", "Please allow camera access to use Air Typing.");
         }
       }
 
-      // Math
-      dist(p1, p2) { return Math.hypot(p1.x - p2.x, p1.y - p2.y); }
-      lerp(a, b, t) { return a + (b - a) * t; }
-
-      analyzeHand(marks) {
-        const wrist = marks[0];
-        const isUp = (tip, pip) => (this.dist(marks[tip], wrist) / this.dist(marks[pip], wrist)) > 1.25;
-
-        const fingers = [isUp(8,6), isUp(12,10), isUp(16,14), isUp(20,18)];
+      handleTyping(char) {
+        if (char === 'SPACE') {
+          this.typedString += " ";
+        } else if (char === 'BACKSPACE') {
+          this.typedString = this.typedString.slice(0, -1);
+        } else {
+          this.typedString += char;
+        }
+        this.outputText.innerText = this.typedString;
         
-        if (fingers.every(f => f)) return 'ERASE';
-        if (fingers[0] && !fingers[1] && !fingers[2] && !fingers[3]) return 'DRAW';
-        return 'PAUSE';
+        // Visual Ripple Effect on screen
+        this.particles.push({
+          x: this.smoothed.x, y: this.smoothed.y, radius: 10, alpha: 1
+        });
       }
 
-      updateStatusUI() {
-        const configs = {
-          'DRAW': { text: 'Drawing', color: this.currentColor, border: this.currentColor },
-          'ERASE': { text: 'Erasing', color: 'var(--accent-danger)', border: 'var(--accent-danger)' },
-          'PAUSE': { text: 'Hovering', color: 'var(--text-primary)', border: 'var(--border-focus)' },
-          'IDLE': { text: 'Hand not found', color: 'var(--text-secondary)', border: 'transparent' }
-        };
+      updateStatusUI(handDetected) {
+        const dot = document.getElementById('statusDot');
+        const text = document.getElementById('statusText');
         
-        const conf = configs[this.mode];
-        this.statusText.innerText = conf.text;
-        this.statusDot.style.background = conf.color;
-        this.statusBadge.style.borderColor = conf.border;
-        this.statusBadge.style.boxShadow = this.mode === 'DRAW' ? `0 0 10px ${this.currentColor}40` : 'none';
+        if (!handDetected) {
+          text.innerText = 'Searching...';
+          dot.style.background = 'var(--text-secondary)';
+          return;
+        }
+
+        if (this.isPinching) {
+          text.innerText = 'Clicking';
+          dot.style.background = 'var(--accent-primary)';
+        } else {
+          text.innerText = 'Hovering';
+          dot.style.background = '#ffffff';
+        }
       }
 
       onAIResults(results) {
         if (!results.multiHandLandmarks?.length) {
-          if (this.mode !== 'IDLE') {
-            this.mode = 'IDLE';
-            this.pointer = { x: null, y: null };
-            this.smoothed = { x: null, y: null };
-            this.updateStatusUI();
+          this.pointer = { x: null, y: null };
+          this.smoothed = { x: null, y: null };
+          this.updateStatusUI(false);
+          if (this.hoveredKey) {
+            this.hoveredKey.el.classList.remove('hovered', 'pressed');
+            this.hoveredKey = null;
           }
           return;
         }
 
         const marks = results.multiHandLandmarks[0];
-        const newMode = this.analyzeHand(marks);
         
-        if (newMode !== this.mode) {
-          this.mode = newMode;
-          this.updateStatusUI();
-        }
-
-        // Map normalized coords (mirrored) to screen space using cover scale maths
+        // Map pointer to screen space (Index Finger Tip)
         const rawX = 1 - marks[8].x;
         const rawY = marks[8].y;
-        
         this.pointer.x = (rawX * this.video.videoWidth * this.vidScale) - this.vidOffsetX;
         this.pointer.y = (rawY * this.video.videoHeight * this.vidScale) - this.vidOffsetY;
 
+        // Initialize smoothed position instantly on first detection
         if (this.smoothed.x === null) {
           this.smoothed = { ...this.pointer };
-          this.lastDrawn = { ...this.pointer };
         }
+
+        // Pinch Detection: distance between thumb tip(4) and index tip(8)
+        // Using normalized 3D coords for distance is highly reliable regardless of screen resolution
+        const dist = Math.hypot(marks[4].x - marks[8].x, marks[4].y - marks[8].y, marks[4].z - marks[8].z);
+        this.isPinching = dist < 0.05; // 0.05 threshold is usually optimal
+        
+        this.updateStatusUI(true);
       }
 
       render() {
         this.uiCtx.clearRect(0, 0, this.uiCanvas.width, this.uiCanvas.height);
 
         if (this.pointer.x !== null) {
-          this.smoothed.x = this.lerp(this.smoothed.x, this.pointer.x, this.lerpFactor);
-          this.smoothed.y = this.lerp(this.smoothed.y, this.pointer.y, this.lerpFactor);
+          // Smooth pointer movement
+          this.smoothed.x += (this.pointer.x - this.smoothed.x) * this.lerpFactor;
+          this.smoothed.y += (this.pointer.y - this.smoothed.y) * this.lerpFactor;
 
-          const size = this.currentSize;
-
-          if (this.mode === 'DRAW') {
-            this.ctx.globalCompositeOperation = 'source-over';
-            this.ctx.strokeStyle = this.currentColor;
-            this.ctx.lineWidth = size;
-            this.ctx.lineCap = 'round';
-            this.ctx.lineJoin = 'round';
-            this.ctx.shadowBlur = size * 1.5;
-            this.ctx.shadowColor = this.currentColor;
-
-            this.ctx.beginPath();
-            this.ctx.moveTo(this.lastDrawn.x, this.lastDrawn.y);
-            this.ctx.lineTo(this.smoothed.x, this.smoothed.y);
-            this.ctx.stroke();
-
-            // UI Cursor (Solid ring)
-            this.uiCtx.beginPath();
-            this.uiCtx.arc(this.smoothed.x, this.smoothed.y, size/2 + 3, 0, Math.PI*2);
-            this.uiCtx.strokeStyle = '#fff';
-            this.uiCtx.lineWidth = 2;
-            this.uiCtx.stroke();
-
-          } else if (this.mode === 'ERASE') {
-            this.ctx.globalCompositeOperation = 'destination-out';
-            this.ctx.lineWidth = size * 4; 
-            this.ctx.lineCap = 'round';
-            this.ctx.lineJoin = 'round';
-            this.ctx.shadowBlur = 0;
-
-            this.ctx.beginPath();
-            this.ctx.moveTo(this.lastDrawn.x, this.lastDrawn.y);
-            this.ctx.lineTo(this.smoothed.x, this.smoothed.y);
-            this.ctx.stroke();
-
-            // Eraser Cursor (Dashed red ring)
-            this.uiCtx.beginPath();
-            this.uiCtx.arc(this.smoothed.x, this.smoothed.y, (size*4)/2, 0, Math.PI*2);
-            this.uiCtx.strokeStyle = 'var(--accent-danger)';
-            this.uiCtx.lineWidth = 2;
-            this.uiCtx.setLineDash([6, 6]);
-            this.uiCtx.stroke();
-            this.uiCtx.setLineDash([]);
-
-          } else if (this.mode === 'PAUSE') {
-            // Hover Cursor
-            this.uiCtx.beginPath();
-            this.uiCtx.arc(this.smoothed.x, this.smoothed.y, 5, 0, Math.PI*2);
-            this.uiCtx.fillStyle = 'rgba(255,255,255,0.6)';
-            this.uiCtx.fill();
+          // 1. Collision Detection with Keyboard UI
+          let newlyHovered = null;
+          for (let item of this.keyElements) {
+            if (!item.bounds) continue;
+            if (this.smoothed.x >= item.bounds.left && this.smoothed.x <= item.bounds.right &&
+                this.smoothed.y >= item.bounds.top && this.smoothed.y <= item.bounds.bottom) {
+              newlyHovered = item;
+              break;
+            }
           }
 
-          this.lastDrawn = { ...this.smoothed };
+          // Handle Hover State Transitions
+          if (this.hoveredKey !== newlyHovered) {
+            if (this.hoveredKey) this.hoveredKey.el.classList.remove('hovered', 'pressed');
+            this.hoveredKey = newlyHovered;
+            if (this.hoveredKey) this.hoveredKey.el.classList.add('hovered');
+          }
+
+          // Handle Click (Pinch) Logic
+          if (this.isPinching) {
+            // Draw green clicking cursor
+            this.uiCtx.beginPath();
+            this.uiCtx.arc(this.smoothed.x, this.smoothed.y, 8, 0, Math.PI*2);
+            this.uiCtx.fillStyle = 'var(--accent-primary)';
+            this.uiCtx.fill();
+            this.uiCtx.shadowBlur = 15;
+            this.uiCtx.shadowColor = 'var(--accent-primary)';
+
+            // Trigger typing only ONCE per pinch (Edge detection)
+            if (!this.wasPinching && this.hoveredKey) {
+              this.hoveredKey.el.classList.add('pressed');
+              this.handleTyping(this.hoveredKey.char);
+            }
+          } else {
+            // Draw normal hovering cursor (hollow ring)
+            this.uiCtx.shadowBlur = 0;
+            this.uiCtx.beginPath();
+            this.uiCtx.arc(this.smoothed.x, this.smoothed.y, 12, 0, Math.PI*2);
+            this.uiCtx.strokeStyle = 'rgba(255,255,255,0.8)';
+            this.uiCtx.lineWidth = 3;
+            this.uiCtx.stroke();
+            
+            // Cleanup pressed state if we released the pinch
+            if (this.wasPinching && this.hoveredKey) {
+              this.hoveredKey.el.classList.remove('pressed');
+            }
+          }
+
+          this.wasPinching = this.isPinching;
+        }
+
+        // 2. Render Particles (Ripple effect on click)
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+          let p = this.particles[i];
+          this.uiCtx.beginPath();
+          this.uiCtx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
+          this.uiCtx.strokeStyle = `rgba(16, 185, 129, ${p.alpha})`; // Emerald Green
+          this.uiCtx.lineWidth = 4 * p.alpha;
+          this.uiCtx.stroke();
+          
+          p.radius += 2;
+          p.alpha -= 0.05;
+          if (p.alpha <= 0) this.particles.splice(i, 1);
         }
 
         requestAnimationFrame(() => this.render());
       }
-
-      exportCanvas() {
-        try {
-          const exp = document.createElement('canvas');
-          exp.width = this.paintCanvas.width; exp.height = this.paintCanvas.height;
-          const eCtx = exp.getContext('2d');
-          
-          eCtx.fillStyle = '#09090b'; // Export with dark background
-          eCtx.fillRect(0, 0, exp.width, exp.height);
-          eCtx.drawImage(this.paintCanvas, 0, 0);
-
-          const link = document.createElement('a');
-          link.download = `lumina-export-${Date.now()}.png`;
-          link.href = exp.toDataURL('image/png');
-          link.click();
-          UIResponses.showToast('Artwork saved to your device', 'success');
-        } catch (e) {
-          UIResponses.showToast('Failed to save artwork', 'error');
-        }
-      }
     }
 
-    // Initialize
-    window.addEventListener('DOMContentLoaded', () => new LuminaApp());
+    window.addEventListener('DOMContentLoaded', () => new AirTypingApp());
   </script>
 </body>
 </html>
